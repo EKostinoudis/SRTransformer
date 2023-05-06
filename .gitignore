@@ -1,0 +1,9 @@
+.ipynb_checkpoints/
+__pycache__/
+tests.ipynb
+models/
+figures/
+*.out
+*.zip
+notes.txt
+model2.py
