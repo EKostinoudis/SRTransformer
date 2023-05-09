@@ -245,3 +245,288 @@ class SRTransformer2(nn.Module):
 
         x = self.conv_end(x)
         return x
+
+class SRTransformer3(nn.Module):
+    def __init__(self, 
+                 channels=3, 
+                 features=8,
+                 num_blocks=[2,4,4],
+                 num_heads=[1,2,4],
+                 gamma=3, 
+                 bias=True
+                ):
+        super().__init__()
+
+        # low-level feature embeddings
+        self.conv_start = nn.Conv2d(channels, features, kernel_size=3, padding=1, bias=bias)
+        # self.up_0 = Upsample(features)
+        curr_features = features
+
+        # encoder 1
+        self.enc_1 = nn.Sequential(*[Transformer_Block(curr_features, num_heads[0], gamma, bias=bias) for _ in range(num_blocks[0])])
+        self.down_1 = Downsample(curr_features)
+        curr_features *= 2
+
+        # encoder 2
+        self.enc_2 = nn.Sequential(*[Transformer_Block(curr_features, num_heads[1], gamma, bias=bias) for _ in range(num_blocks[1])])
+        self.down_2 = Downsample(curr_features)
+        curr_features *= 2
+
+        # encoder 3
+        self.enc_3 = nn.Sequential(*[Transformer_Block(curr_features, num_heads[2], gamma, bias=bias) for _ in range(num_blocks[2])])
+
+        # decoder 2
+        self.up_2 = Upsample(curr_features)
+        curr_features //= 2
+        self.reduce_channels_2 = nn.Conv2d(curr_features*2, curr_features, kernel_size=1, bias=bias)
+        self.dec_2 = nn.Sequential(*[Transformer_Block(curr_features, num_heads[1], gamma, bias=bias) for _ in range(num_blocks[1])])
+
+        # decoder 1
+        self.up_1 = Upsample(curr_features)
+        curr_features //= 2
+        self.reduce_channels_1 = nn.Conv2d(curr_features*2, curr_features, kernel_size=1, bias=bias)
+        self.dec_1 = nn.Sequential(*[Transformer_Block(curr_features, num_heads[0], gamma, bias=bias) for _ in range(num_blocks[0])])
+
+        # decoder 0
+        self.up_0 = Upsample(curr_features)
+        curr_features //= 2
+        self.dec_0 = nn.Sequential(*[Transformer_Block(curr_features, num_heads[0], gamma, bias=bias) for _ in range(num_blocks[0])])
+
+        # final convolution
+        self.conv_end = nn.Conv2d(curr_features, channels, kernel_size=3, padding=1, bias=bias)
+
+    def forward(self, x):
+        x = self.conv_start(x)
+
+        # encoders
+        x1 = self.enc_1(x)
+        x2 = self.enc_2(self.down_1(x1))
+        x3 = self.enc_3(self.down_2(x2))
+
+        # decoders
+        x = self.dec_2(self.reduce_channels_2(torch.cat([self.up_2(x3), x2], 1)))
+        x = self.dec_1(self.reduce_channels_1(torch.cat([self.up_1(x), x1], 1)))
+
+        x = self.dec_0(self.up_0(x))
+
+        x = self.conv_end(x)
+        return x
+
+class SRTransformer4(nn.Module):
+    def __init__(self, 
+                 channels=3, 
+                 features=4,
+                 # num_blocks=[2,2,4,4],
+                 num_blocks=[2,2,2,3],
+                 num_heads=[1,2,4,8],
+                 gamma=3, 
+                 bias=True
+                ):
+        super().__init__()
+
+        # low-level feature embeddings
+        self.conv_start = nn.Conv2d(channels, features, kernel_size=3, padding=1, bias=bias)
+        # self.up_0 = Upsample(features)
+        curr_features = features
+
+        # encoder 1
+        self.enc_1 = nn.Sequential(*[Transformer_Block(curr_features, num_heads[0], gamma, bias=bias) for _ in range(num_blocks[0])])
+        self.down_1 = Downsample(curr_features)
+        curr_features *= 2
+
+        # encoder 2
+        self.enc_2 = nn.Sequential(*[Transformer_Block(curr_features, num_heads[1], gamma, bias=bias) for _ in range(num_blocks[1])])
+        self.down_2 = Downsample(curr_features)
+        curr_features *= 2
+
+        # encoder 3
+        self.enc_3 = nn.Sequential(*[Transformer_Block(curr_features, num_heads[2], gamma, bias=bias) for _ in range(num_blocks[2])])
+        self.down_3 = Downsample(curr_features)
+        curr_features *= 2
+
+        # encoder 4
+        self.enc_4 = nn.Sequential(*[Transformer_Block(curr_features, num_heads[3], gamma, bias=bias) for _ in range(num_blocks[3])])
+
+        # decoder 3
+        self.up_3 = Upsample(curr_features)
+        curr_features //= 2
+        self.reduce_channels_3 = nn.Conv2d(curr_features*2, curr_features, kernel_size=1, bias=bias)
+        self.dec_3 = nn.Sequential(*[Transformer_Block(curr_features, num_heads[2], gamma, bias=bias) for _ in range(num_blocks[2])])
+
+        # decoder 2
+        self.up_2 = Upsample(curr_features)
+        curr_features //= 2
+        self.reduce_channels_2 = nn.Conv2d(curr_features*2, curr_features, kernel_size=1, bias=bias)
+        self.dec_2 = nn.Sequential(*[Transformer_Block(curr_features, num_heads[1], gamma, bias=bias) for _ in range(num_blocks[1])])
+
+        # decoder 1
+        self.up_1 = Upsample(curr_features)
+        curr_features //= 2
+        self.reduce_channels_1 = nn.Conv2d(curr_features*2, curr_features, kernel_size=1, bias=bias)
+        self.dec_1 = nn.Sequential(*[Transformer_Block(curr_features, num_heads[0], gamma, bias=bias) for _ in range(num_blocks[0])])
+
+        # decoder 0
+        self.up_0 = Upsample(curr_features)
+        curr_features //= 2
+        self.dec_0 = nn.Sequential(*[Transformer_Block(curr_features, num_heads[0], gamma, bias=bias) for _ in range(num_blocks[0])])
+
+        # final convolution
+        self.conv_end = nn.Conv2d(curr_features, channels, kernel_size=3, padding=1, bias=bias)
+
+    def forward(self, x):
+        x = self.conv_start(x)
+
+        # encoders
+        x1 = self.enc_1(x)
+        x2 = self.enc_2(self.down_1(x1))
+        x3 = self.enc_3(self.down_2(x2))
+        x4 = self.enc_4(self.down_3(x3))
+
+        # decoders
+        x = self.dec_3(self.reduce_channels_3(torch.cat([self.up_3(x4), x3], 1)))
+        x = self.dec_2(self.reduce_channels_2(torch.cat([self.up_2(x), x2], 1)))
+        x = self.dec_1(self.reduce_channels_1(torch.cat([self.up_1(x), x1], 1)))
+
+        x = self.dec_0(self.up_0(x))
+
+        x = self.conv_end(x)
+        return x
+
+class SRTransformer5(nn.Module):
+    def __init__(self, 
+                 channels=3, 
+                 features=8,
+                 num_blocks=[2,2,2,3],
+                 num_heads=[1,2,4,8],
+                 gamma=3, 
+                 bias=True
+                ):
+        super().__init__()
+
+        # low-level feature embeddings
+        self.conv_start = nn.Conv2d(channels, features, kernel_size=3, padding=1, bias=bias)
+        self.up_0 = Upsample(features)
+        curr_features = features // 2
+
+        # encoder 1
+        self.enc_1 = nn.Sequential(*[Transformer_Block(curr_features, num_heads[0], gamma, bias=bias) for _ in range(num_blocks[0])])
+        self.down_1 = Downsample(curr_features)
+        curr_features *= 2
+
+        # encoder 2
+        self.enc_2 = nn.Sequential(*[Transformer_Block(curr_features, num_heads[1], gamma, bias=bias) for _ in range(num_blocks[1])])
+        self.down_2 = Downsample(curr_features)
+        curr_features *= 2
+
+        # encoder 3
+        self.enc_3 = nn.Sequential(*[Transformer_Block(curr_features, num_heads[2], gamma, bias=bias) for _ in range(num_blocks[2])])
+        self.down_3 = Downsample(curr_features)
+        curr_features *= 2
+
+        # encoder 4
+        self.enc_4 = nn.Sequential(*[Transformer_Block(curr_features, num_heads[3], gamma, bias=bias) for _ in range(num_blocks[3])])
+
+        # decoder 3
+        self.up_3 = Upsample(curr_features)
+        curr_features //= 2
+        self.reduce_channels_3 = nn.Conv2d(curr_features*2, curr_features, kernel_size=1, bias=bias)
+        self.dec_3 = nn.Sequential(*[Transformer_Block(curr_features, num_heads[2], gamma, bias=bias) for _ in range(num_blocks[2])])
+
+        # decoder 2
+        self.up_2 = Upsample(curr_features)
+        curr_features //= 2
+        self.reduce_channels_2 = nn.Conv2d(curr_features*2, curr_features, kernel_size=1, bias=bias)
+        self.dec_2 = nn.Sequential(*[Transformer_Block(curr_features, num_heads[1], gamma, bias=bias) for _ in range(num_blocks[1])])
+
+        # decoder 1
+        self.up_1 = Upsample(curr_features)
+        curr_features //= 2
+        self.reduce_channels_1 = nn.Conv2d(curr_features*2, curr_features, kernel_size=1, bias=bias)
+        self.dec_1 = nn.Sequential(*[Transformer_Block(curr_features, num_heads[0], gamma, bias=bias) for _ in range(num_blocks[0])])
+
+        # final convolution
+        self.conv_end = nn.Conv2d(curr_features, channels, kernel_size=3, padding=1, bias=bias)
+    
+    def forward(self, x):
+        x = self.up_0(self.conv_start(x))
+
+        # encoders
+        x1 = self.enc_1(x)
+        x2 = self.enc_2(self.down_1(x1))
+        x3 = self.enc_3(self.down_2(x2))
+        x4 = self.enc_4(self.down_3(x3))
+
+        # decoders
+        x = self.dec_3(self.reduce_channels_3(torch.cat([self.up_3(x4), x3], 1)))
+        x = self.dec_2(self.reduce_channels_2(torch.cat([self.up_2(x), x2], 1)))
+        x = self.dec_1(self.reduce_channels_1(torch.cat([self.up_1(x), x1], 1)))
+
+        x = self.conv_end(x)
+        return x
+
+class SRTransformer6(nn.Module):
+    def __init__(self, 
+                 channels=3, 
+                 features=8,
+                 num_blocks=[2,2,3],
+                 num_heads=[1,2,4],
+                 refinement_blocks = 2,
+                 gamma=3, 
+                 bias=False,
+                ):
+        super().__init__()
+
+        # self.upsample = nn.Upsample(scale_factor=2, mode='bilinear')
+        self.upsample = nn.Upsample(scale_factor=2, mode='nearest')
+
+        # low-level feature embeddings
+        self.conv_start = nn.Conv2d(channels, features, kernel_size=3, padding=1, bias=bias)
+        curr_features = features
+
+        # encoder 1
+        self.enc_1 = nn.Sequential(*[Transformer_Block(curr_features, num_heads[0], gamma, bias=bias) for _ in range(num_blocks[0])])
+        self.down_1 = Downsample(curr_features)
+        curr_features *= 2
+
+        # encoder 2
+        self.enc_2 = nn.Sequential(*[Transformer_Block(curr_features, num_heads[1], gamma, bias=bias) for _ in range(num_blocks[1])])
+        self.down_2 = Downsample(curr_features)
+        curr_features *= 2
+
+        # encoder 3
+        self.enc_3 = nn.Sequential(*[Transformer_Block(curr_features, num_heads[2], gamma, bias=bias) for _ in range(num_blocks[2])])
+
+        # decoder 2
+        self.up_2 = Upsample(curr_features)
+        curr_features //= 2
+        self.reduce_channels_2 = nn.Conv2d(curr_features*2, curr_features, kernel_size=1, bias=bias)
+        self.dec_2 = nn.Sequential(*[Transformer_Block(curr_features, num_heads[1], gamma, bias=bias) for _ in range(num_blocks[1])])
+
+        # decoder 1
+        self.up_1 = Upsample(curr_features)
+        curr_features //= 2
+        self.dec_1 = nn.Sequential(*[Transformer_Block(curr_features*2, num_heads[0], gamma, bias=bias) for _ in range(num_blocks[0])])
+
+        # refinement
+        self.refinement = nn.Sequential(*[Transformer_Block(curr_features*2, num_heads[0], gamma, bias=bias) for _ in range(refinement_blocks)])
+
+        # final convolution
+        self.conv_end = nn.Conv2d(curr_features*2, channels, kernel_size=3, padding=1, bias=bias)
+    
+    def forward(self, x):
+        x_in = self.upsample(x)
+        x = self.conv_start(x_in)
+
+        # encoders
+        x1 = self.enc_1(x)
+        x2 = self.enc_2(self.down_1(x1))
+        x3 = self.enc_3(self.down_2(x2))
+
+        # decoders
+        x = self.dec_2(self.reduce_channels_2(torch.cat([self.up_2(x3), x2], 1)))
+        x = self.dec_1(torch.cat([self.up_1(x), x1], 1))
+
+        x = self.refinement(x)
+
+        x = self.conv_end(x)
+        return x + x_in
