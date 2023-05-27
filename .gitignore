@@ -3,6 +3,7 @@ __pycache__/
 tests.ipynb
 models/
 figures/
+others/
 *.out
 *.zip
 notes.txt
